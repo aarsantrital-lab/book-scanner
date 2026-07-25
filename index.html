@@ -2,376 +2,453 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="theme-color" content="#0a0a0b" />
   <title>Book Scanner → PDF</title>
   <style>
-    :root { --bg:#0a0a0b; --panel:#141417; --panel2:#1c1c21; --border:#2a2a32; --text:#f4f4f5; --muted:#a1a1aa; --accent:#7cffb2; --danger:#ff6b7a; }
-    * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
-    html,body { margin:0; height:100%; background:var(--bg); color:var(--text); font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; overflow:hidden; }
-    #app { height:100%; display:grid; grid-template-rows:auto 1fr auto auto; }
-    header { display:flex; align-items:center; justify-content:space-between; padding:10px 14px; background:rgba(10,10,11,.92); border-bottom:1px solid var(--border); z-index:5; }
-    header h1 { margin:0; font-size:15px; font-weight:650; }
-    .badge { display:inline-flex; align-items:center; gap:6px; background:var(--panel2); border:1px solid var(--border); border-radius:999px; padding:4px 10px; font-size:12px; font-weight:600; }
-    .badge .dot { width:7px; height:7px; border-radius:50%; background:var(--muted); }
-    .badge.live .dot { background:var(--accent); box-shadow:0 0 8px var(--accent); }
-    #stage { position:relative; overflow:hidden; background:#000; min-height:0; }
-    #video { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; background:#000; }
-    #guide { position:absolute; left:6%; right:6%; top:8%; bottom:10%; border:1.5px solid rgba(124,255,178,.55); border-radius:10px; box-shadow:0 0 0 9999px rgba(0,0,0,.28); pointer-events:none; }
-    #flash { position:absolute; inset:0; background:#fff; opacity:0; pointer-events:none; transition:opacity .08s linear; }
-    #flash.on { opacity:.85; }
-    #status { position:absolute; left:12px; right:12px; bottom:12px; text-align:center; font-size:12px; color:#fff; text-shadow:0 1px 3px rgba(0,0,0,.8); pointer-events:none; }
-    #thumbs-wrap { background:var(--panel); border-top:1px solid var(--border); padding:8px 10px calc(8px + env(safe-area-inset-bottom,0px)); min-height:92px; }
-    #thumbs { display:flex; gap:8px; overflow-x:auto; }
-    .thumb { position:relative; flex:0 0 auto; width:64px; height:84px; border-radius:8px; overflow:hidden; border:1px solid var(--border); background:#000; }
-    .thumb img { width:100%; height:100%; object-fit:cover; display:block; }
-    .thumb .n { position:absolute; left:4px; top:4px; background:rgba(0,0,0,.7); color:#fff; font-size:10px; font-weight:700; padding:1px 5px; border-radius:999px; }
-    .thumb button.x { position:absolute; right:2px; top:2px; width:20px; height:20px; border:0; border-radius:50%; background:rgba(0,0,0,.7); color:#fff; font-size:12px; padding:0; }
-    #empty { color:var(--muted); font-size:12px; padding:22px 8px; text-align:center; }
-    #controls { display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:8px; padding:12px 16px calc(14px + env(safe-area-inset-bottom,0px)); background:rgba(10,10,11,.96); border-top:1px solid var(--border); }
-    .side { display:flex; flex-direction:column; gap:8px; }
-    .side.right { align-items:end; }
-    button { appearance:none; border:1px solid var(--border); background:var(--panel2); color:var(--text); border-radius:12px; padding:10px 12px; font-size:13px; font-weight:600; cursor:pointer; }
-    button:disabled { opacity:.4; }
-    button.danger { border-color:rgba(255,107,122,.4); color:var(--danger); }
-    button.primary { background:linear-gradient(180deg,#9dffc6,var(--accent)); color:#062314; border-color:transparent; font-weight:750; }
-    #shutter { width:78px; height:78px; border-radius:50%; border:4px solid #fff; background:transparent; padding:0; display:grid; place-items:center; }
-    #shutter::after { content:""; width:60px; height:60px; border-radius:50%; background:#f4f4f5; }
-    #shutter:active::after { transform:scale(.92); background:var(--accent); }
-    #gate { position:fixed; inset:0; background:var(--bg); z-index:20; display:grid; place-items:center; padding:24px; }
-    #gate .card { width:min(420px,100%); background:var(--panel); border:1px solid var(--border); border-radius:18px; padding:22px; }
-    #gate h2 { margin:0 0 8px; font-size:20px; }
-    #gate p, #gate li { color:var(--muted); font-size:14px; line-height:1.45; }
-    #gate ul { margin:0 0 16px; padding-left:18px; }
-    #gate .row { display:flex; flex-direction:column; gap:8px; }
-    input[type="text"] { width:100%; background:var(--panel2); border:1px solid var(--border); color:var(--text); border-radius:10px; padding:10px 12px; font-size:14px; margin-bottom:12px; }
-    #toast { position:fixed; left:50%; bottom:calc(130px + env(safe-area-inset-bottom,0px)); transform:translateX(-50%) translateY(20px); background:#111; border:1px solid var(--border); padding:10px 14px; border-radius:12px; font-size:13px; opacity:0; pointer-events:none; transition:.2s; z-index:30; max-width:90vw; }
-    #toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
-    #progress { display:none; position:fixed; inset:0; background:rgba(0,0,0,.72); z-index:40; place-items:center; }
-    #progress.show { display:grid; }
-    #progress .box { background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:18px 22px; min-width:220px; text-align:center; }
-    #err { position:fixed; left:8px; right:8px; bottom:8px; z-index:50; color:#ff9; font-size:11px; white-space:pre-wrap; pointer-events:none; max-height:30vh; overflow:auto; }
+    :root {
+      --bg:#0a0a0b; --panel:#141417; --panel2:#1c1c21; --border:#2a2a32;
+      --text:#f4f4f5; --muted:#a1a1aa; --accent:#7cffb2; --danger:#ff6b7a;
+      --safe-b: env(safe-area-inset-bottom, 0px);
+    }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body {
+      margin: 0; min-height: 100%; background: var(--bg); color: var(--text);
+      font-family: ui-sans-serif, system-ui, -apple-system, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+    }
+    body { padding: 16px 16px calc(24px + var(--safe-b)); }
+    h1 { margin: 8px 0 4px; font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
+    .sub { color: var(--muted); font-size: 14px; line-height: 1.45; margin: 0 0 16px; }
+    .card {
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: 18px; padding: 16px; margin-bottom: 14px;
+    }
+    label.field { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; font-weight: 600; }
+    input[type="text"] {
+      width: 100%; background: var(--panel2); border: 1px solid var(--border);
+      color: var(--text); border-radius: 12px; padding: 12px 14px; font-size: 16px;
+      margin-bottom: 12px;
+    }
+    .btn {
+      display: block; width: 100%; appearance: none; border: 0; border-radius: 14px;
+      padding: 16px 14px; font-size: 16px; font-weight: 700; cursor: pointer;
+      margin-bottom: 10px; text-align: center;
+    }
+    .btn:disabled { opacity: .45; }
+    .btn.primary {
+      background: linear-gradient(180deg, #9dffc6, var(--accent));
+      color: #062314;
+    }
+    .btn.secondary {
+      background: var(--panel2); color: var(--text); border: 1px solid var(--border);
+    }
+    .btn.danger {
+      background: transparent; color: var(--danger); border: 1px solid rgba(255,107,122,.35);
+    }
+    .btn.ghost {
+      background: transparent; color: var(--muted); border: 1px dashed var(--border);
+      font-weight: 600; font-size: 14px;
+    }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .stats {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 12px; gap: 8px;
+    }
+    .badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: var(--panel2); border: 1px solid var(--border);
+      border-radius: 999px; padding: 6px 12px; font-size: 13px; font-weight: 700;
+    }
+    .badge .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+    #thumbs {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+      min-height: 40px;
+    }
+    .thumb {
+      position: relative; aspect-ratio: 3/4; border-radius: 10px; overflow: hidden;
+      border: 1px solid var(--border); background: #000;
+    }
+    .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .thumb .n {
+      position: absolute; left: 6px; top: 6px; background: rgba(0,0,0,.75);
+      color: #fff; font-size: 11px; font-weight: 700; padding: 2px 6px; border-radius: 999px;
+    }
+    .thumb .x {
+      position: absolute; right: 4px; top: 4px; width: 28px; height: 28px;
+      border: 0; border-radius: 50%; background: rgba(0,0,0,.75); color: #fff;
+      font-size: 16px; line-height: 1;
+    }
+    #empty { color: var(--muted); font-size: 13px; text-align: center; padding: 28px 8px; grid-column: 1 / -1; }
+    #status { color: var(--muted); font-size: 12px; margin-top: 8px; min-height: 1.2em; }
+    #err {
+      color: #ffb4ba; font-size: 12px; white-space: pre-wrap; margin-top: 8px;
+      background: rgba(255,107,122,.08); border: 1px solid rgba(255,107,122,.25);
+      border-radius: 10px; padding: 8px 10px; display: none;
+    }
+    #err.show { display: block; }
+    #toast {
+      position: fixed; left: 50%; bottom: calc(24px + var(--safe-b));
+      transform: translateX(-50%) translateY(12px);
+      background: #111; border: 1px solid var(--border); color: var(--text);
+      padding: 10px 14px; border-radius: 12px; font-size: 13px; opacity: 0;
+      pointer-events: none; transition: .2s; z-index: 30; max-width: 90vw;
+    }
+    #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    #progress {
+      display: none; position: fixed; inset: 0; background: rgba(0,0,0,.72);
+      z-index: 40; place-items: center;
+    }
+    #progress.show { display: grid; }
+    #progress .box {
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: 14px; padding: 18px 22px; min-width: 220px; text-align: center;
+    }
+    .tips { color: var(--muted); font-size: 12px; line-height: 1.45; margin: 0; padding-left: 18px; }
+    .tips li { margin-bottom: 4px; }
+    /* Native camera inputs — keep them offscreen but reachable via JS click */
+    #camOne, #camMany, #libMany { position: fixed; left: -9999px; width: 1px; height: 1px; opacity: 0; }
   </style>
 </head>
 <body>
-<div id="gate">
+  <h1>Book Scanner</h1>
+  <p class="sub">iPhone-friendly. Each shutter opens the <b>native back camera</b>, adds the page, then you can shoot the next. At the end you get one PDF. Nothing uploads.</p>
+
   <div class="card">
-    <h2>Book Scanner</h2>
-    <p>Uses your <b>back camera</b>. Snap each page, then tap <b>End → PDF</b> for one multi-page file. Pages stay on your phone.</p>
-    <ul>
-      <li>HTTPS only (GitHub Pages link works)</li>
-      <li>Good light, fill the green frame, hold steady</li>
-    </ul>
-    <input id="title" type="text" value="book-scan" autocomplete="off" />
+    <label class="field" for="title">PDF file name</label>
+    <input id="title" type="text" value="book-scan" autocomplete="off" enterkeyhint="done" />
+
+    <!-- iOS: capture=environment opens native camera (back). No getUserMedia hang. -->
+    <input id="camOne" type="file" accept="image/*" capture="environment" />
+    <input id="camMany" type="file" accept="image/*" multiple />
+    <input id="libMany" type="file" accept="image/*" multiple />
+
+    <button class="btn primary" id="snapBtn" type="button">📷 Snap next page</button>
     <div class="row">
-      <button class="primary" id="startBtn" type="button">Allow camera & start</button>
-      <button id="galleryBtn" type="button">Or import photos instead</button>
-      <input id="gallery" type="file" accept="image/*" multiple hidden />
+      <button class="btn secondary" id="importBtn" type="button">Import photos</button>
+      <button class="btn secondary" id="multiCamBtn" type="button">Multi-select</button>
     </div>
+    <p id="status">Tap Snap → take photo of page 1 → it appears below → repeat.</p>
+    <div id="err"></div>
   </div>
-</div>
 
-<div id="app" hidden>
-  <header>
-    <div><h1>Book Scanner</h1></div>
-    <div class="badge" id="liveBadge"><span class="dot"></span><span id="pageCount">0 pages</span></div>
-  </header>
-  <div id="stage">
-    <video id="video" playsinline autoplay muted></video>
-    <div id="guide"></div>
-    <div id="flash"></div>
-    <div id="status">Align page inside frame · tap shutter</div>
-  </div>
-  <div id="thumbs-wrap">
-    <div id="empty">No pages yet — capture the first one</div>
-    <div id="thumbs" hidden></div>
-  </div>
-  <div id="controls">
-    <div class="side">
-      <button type="button" id="undoBtn" disabled>Undo</button>
-      <button type="button" id="clearBtn" class="danger" disabled>Clear</button>
+  <div class="card">
+    <div class="stats">
+      <div class="badge"><span class="dot"></span><span id="pageCount">0 pages</span></div>
+      <button class="btn ghost" id="undoBtn" type="button" style="width:auto;margin:0;padding:8px 12px" disabled>Undo last</button>
     </div>
-    <button type="button" id="shutter" aria-label="Capture"></button>
-    <div class="side right">
-      <button type="button" class="primary" id="endBtn" disabled>End → PDF</button>
-      <button type="button" id="switchBtn">Flip cam</button>
-    </div>
+    <div id="thumbs"><div id="empty">No pages yet</div></div>
   </div>
-</div>
 
-<div id="toast"></div>
-<div id="progress"><div class="box" id="progressText">Building PDF…</div></div>
-<div id="err"></div>
+  <div class="card">
+    <button class="btn primary" id="endBtn" type="button" disabled>End → Download PDF</button>
+    <button class="btn danger" id="clearBtn" type="button" disabled>Clear all pages</button>
+  </div>
+
+  <div class="card">
+    <ul class="tips">
+      <li>Bright light, whole page in frame, hold still.</li>
+      <li>If camera permission was denied: Settings → Safari → Camera → Allow, then reload.</li>
+      <li>Works offline after first load (PDF engine needs network once).</li>
+    </ul>
+  </div>
+
+  <div id="toast"></div>
+  <div id="progress"><div class="box" id="progressText">Working…</div></div>
 
 <script>
-// ---------- tiny helpers ----------
-const $ = id => document.getElementById(id);
-const pages = [];
-let stream = null;
-let facingMode = 'environment';
-let capturing = false;
+(function () {
+  'use strict';
 
-function toast(msg, ms = 2600) {
-  const t = $('toast');
-  t.textContent = msg;
-  t.classList.add('show');
-  clearTimeout(toast._t);
-  toast._t = setTimeout(() => t.classList.remove('show'), ms);
-}
-function showErr(msg) {
-  $('err').textContent = (msg + '').slice(0, 400);
-  setTimeout(() => { $('err').textContent = ''; }, 6000);
-  console.error(msg);
-}
+  var pages = []; // {dataUrl,w,h}
+  var busy = false;
 
-// ---------- load jsPDF lazily & robustly ----------
-let jspdfReady = null;
-function loadJsPdf() {
-  if (window.jspdf && window.jspdf.jsPDF) return Promise.resolve();
-  if (jspdfReady) return jspdfReady;
-  const urls = [
-    'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
-    'https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js'
-  ];
-  jspdfReady = new Promise((resolve, reject) => {
-    (function tryNext(i) {
-      if (i >= urls.length) return reject(new Error('PDF library failed to load'));
-      const s = document.createElement('script');
-      s.src = urls[i];
-      s.onload = () => (window.jspdf && window.jspdf.jsPDF) ? resolve() : tryNext(i + 1);
-      s.onerror = () => tryNext(i + 1);
-      document.head.appendChild(s);
-    })(0);
-  });
-  return jspdfReady;
-}
-// warm it up early (non-blocking)
-loadJsPdf().catch(() => {});
+  function $(id) { return document.getElementById(id); }
 
-// ---------- UI state ----------
-function setCount() {
-  const n = pages.length;
-  $('pageCount').textContent = n + (n === 1 ? ' page' : ' pages');
-  $('undoBtn').disabled = n === 0;
-  $('clearBtn').disabled = n === 0;
-  $('endBtn').disabled = n === 0;
-  $('empty').hidden = n > 0;
-  $('thumbs').hidden = n === 0;
-  $('liveBadge').classList.toggle('live', !!stream);
-}
-function renderThumbs() {
-  const root = $('thumbs');
-  root.innerHTML = '';
-  pages.forEach((p, i) => {
-    const el = document.createElement('div');
-    el.className = 'thumb';
-    el.innerHTML = '<img src="' + p.dataUrl + '" /><span class="n">' + (i + 1) + '</span>';
-    const x = document.createElement('button');
-    x.className = 'x'; x.type = 'button'; x.textContent = '×';
-    x.onclick = () => { pages.splice(i, 1); renderThumbs(); toast('Removed page ' + (i + 1)); };
-    el.appendChild(x);
-    root.appendChild(el);
-  });
-  root.scrollLeft = root.scrollWidth;
-  setCount();
-}
+  function toast(msg, ms) {
+    ms = ms || 2400;
+    var t = $('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toast._t);
+    toast._t = setTimeout(function () { t.classList.remove('show'); }, ms);
+  }
 
-// ---------- camera ----------
-function stopCamera() {
-  if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
-  $('video').srcObject = null;
-}
+  function showErr(msg) {
+    var e = $('err');
+    e.textContent = String(msg || '').slice(0, 500);
+    e.classList.add('show');
+    console.error(msg);
+  }
+  function clearErr() {
+    var e = $('err');
+    e.textContent = '';
+    e.classList.remove('show');
+  }
 
-function waitForVideo(video, ms = 9000) {
-  return new Promise((resolve, reject) => {
-    let done = false;
-    const to = setTimeout(() => {
-      if (done) return; done = true;
-      if (video.videoWidth) resolve(); else reject(new Error('Camera timed out (no frames)'));
-    }, ms);
-    function check() {
-      if (done) return;
-      if (video.videoWidth > 0) { done = true; clearTimeout(to); resolve(); return; }
-      requestAnimationFrame(check);
-    }
-    check();
-  });
-}
+  function setCount() {
+    var n = pages.length;
+    $('pageCount').textContent = n + (n === 1 ? ' page' : ' pages');
+    $('undoBtn').disabled = n === 0;
+    $('clearBtn').disabled = n === 0;
+    $('endBtn').disabled = n === 0 || busy;
+    $('snapBtn').disabled = busy;
+  }
 
-async function startCamera() {
-  stopCamera();
-  const video = $('video');
-  const tries = [
-    { audio: false, video: { facingMode: { exact: facingMode } } },
-    { audio: false, video: { facingMode: facingMode } },
-    { audio: false, video: true }
-  ];
-  let lastErr = null;
-  for (const c of tries) {
-    try {
-      stream = await navigator.mediaDevices.getUserMedia(c);
-      video.srcObject = stream;
-      // play() can hang on some mobile browsers — don't await it, race a timeout
-      const playP = video.play().catch(() => {});
-      await Promise.race([playP, new Promise(r => setTimeout(r, 3000))]);
-      await waitForVideo(video);
-      $('liveBadge').classList.add('live');
+  function renderThumbs() {
+    var root = $('thumbs');
+    root.innerHTML = '';
+    if (!pages.length) {
+      var empty = document.createElement('div');
+      empty.id = 'empty';
+      empty.textContent = 'No pages yet';
+      root.appendChild(empty);
+      setCount();
       return;
-    } catch (e) {
-      lastErr = e;
-      stopCamera();
     }
-  }
-  throw lastErr || new Error('Could not start camera');
-}
-
-// ---------- capture ----------
-function flash() { const f = $('flash'); f.classList.add('on'); setTimeout(() => f.classList.remove('on'), 80); }
-
-async function onShutter() {
-  if (capturing) return;
-  const video = $('video');
-  if (!stream || !video.videoWidth) { toast('Camera not ready'); return; }
-  capturing = true;
-  try {
-    flash();
-    await new Promise(r => setTimeout(r, 30));
-    const w = video.videoWidth, h = video.videoHeight;
-    const c = document.createElement('canvas');
-    c.width = w; c.height = h;
-    c.getContext('2d').drawImage(video, 0, 0, w, h);
-    pages.push({ dataUrl: c.toDataURL('image/jpeg', 0.85), w, h });
-    renderThumbs();
-    $('status').textContent = 'Captured page ' + pages.length + ' · flip to next';
-    if (navigator.vibrate) navigator.vibrate(25);
-  } catch (err) {
-    showErr('Capture failed: ' + (err.message || err));
-  } finally {
-    capturing = false;
-  }
-}
-
-// ---------- PDF ----------
-async function buildPdf() {
-  if (!pages.length) return;
-  $('progress').classList.add('show');
-  $('progressText').textContent = 'Loading PDF engine…';
-  try {
-    await loadJsPdf();
-  } catch (e) {
-    $('progress').classList.remove('show');
-    toast('PDF engine failed — check network, try import→export again');
-    return;
-  }
-  const { jsPDF } = window.jspdf;
-  try {
-    const first = pages[0];
-    const pdf = new jsPDF({ orientation: first.w > first.h ? 'landscape' : 'portrait', unit: 'pt', format: 'a4', compress: true });
-    for (let i = 0; i < pages.length; i++) {
-      $('progressText').textContent = 'Building PDF… ' + (i + 1) + '/' + pages.length;
-      await new Promise(r => setTimeout(r, 0));
-      const p = pages[i];
-      if (i > 0) pdf.addPage('a4', p.w > p.h ? 'landscape' : 'portrait');
-      const pw = pdf.internal.pageSize.getWidth();
-      const ph = pdf.internal.pageSize.getHeight();
-      const m = 12;
-      const scale = Math.min((pw - m * 2) / p.w, (ph - m * 2) / p.h);
-      const dw = p.w * scale, dh = p.h * scale;
-      pdf.addImage(p.dataUrl, 'JPEG', (pw - dw) / 2, (ph - dh) / 2, dw, dh, undefined, 'FAST');
-    }
-    let name = ($('title').value || 'book-scan').trim().replace(/[\\/:*?"<>|]+/g, '-') || 'book-scan';
-    if (!name.toLowerCase().endsWith('.pdf')) name += '.pdf';
-    pdf.save(name);
-    toast('Saved ' + name + ' (' + pages.length + ' pages)');
-  } catch (err) {
-    showErr('PDF failed: ' + (err.message || err));
-  } finally {
-    $('progress').classList.remove('show');
-  }
-}
-
-// ---------- photo import fallback ----------
-async function addFiles(fileList) {
-  const files = [...fileList].filter(f => f.type.startsWith('image/'));
-  if (!files.length) { toast('No images selected'); return; }
-  $('progress').classList.add('show');
-  try {
-    for (let i = 0; i < files.length; i++) {
-      $('progressText').textContent = 'Importing… ' + (i + 1) + '/' + files.length;
-      const dataUrl = await new Promise((res, rej) => {
-        const r = new FileReader();
-        r.onload = () => res(r.result); r.onerror = rej;
-        r.readAsDataURL(files[i]);
-      });
-      const img = await new Promise((res, rej) => {
-        const im = new Image();
-        im.onload = () => res(im); im.onerror = rej;
-        im.src = dataUrl;
-      });
-      const c = document.createElement('canvas');
-      c.width = img.naturalWidth; c.height = img.naturalHeight;
-      c.getContext('2d').drawImage(img, 0, 0);
-      pages.push({ dataUrl: c.toDataURL('image/jpeg', 0.85), w: img.naturalWidth, h: img.naturalHeight });
-    }
-    $('gate').hidden = true;
-    $('app').hidden = false;
-    renderThumbs();
-    toast('Imported ' + files.length + ' photos');
-  } catch (err) {
-    showErr('Import failed: ' + (err.message || err));
-  } finally {
-    $('progress').classList.remove('show');
-  }
-}
-
-// ---------- wire up ----------
-$('startBtn').onclick = async () => {
-  const btn = $('startBtn');
-  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    toast('Camera API not available — use import photos'); return;
-  }
-  if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
-    toast('Camera needs HTTPS'); return;
-  }
-  btn.disabled = true;
-  btn.textContent = 'Starting…';
-  // watchdog: never stay stuck on "Starting…"
-  const watchdog = setTimeout(() => {
-    btn.disabled = false;
-    btn.textContent = 'Allow camera & start';
-    toast('Camera is slow — check permission, or import photos');
-  }, 15000);
-  try {
-    await startCamera();
-    clearTimeout(watchdog);
-    $('gate').hidden = true;
-    $('app').hidden = false;
+    pages.forEach(function (p, i) {
+      var el = document.createElement('div');
+      el.className = 'thumb';
+      var img = document.createElement('img');
+      img.src = p.dataUrl;
+      img.alt = 'page ' + (i + 1);
+      var n = document.createElement('span');
+      n.className = 'n';
+      n.textContent = String(i + 1);
+      var x = document.createElement('button');
+      x.type = 'button';
+      x.className = 'x';
+      x.textContent = '×';
+      x.setAttribute('aria-label', 'Remove page ' + (i + 1));
+      x.onclick = function () {
+        pages.splice(i, 1);
+        renderThumbs();
+        toast('Removed page ' + (i + 1));
+        $('status').textContent = pages.length
+          ? (pages.length + ' page(s) ready. Snap next or End → PDF.')
+          : 'Tap Snap → take photo of page 1.';
+      };
+      el.appendChild(img);
+      el.appendChild(n);
+      el.appendChild(x);
+      root.appendChild(el);
+    });
     setCount();
-  } catch (err) {
-    clearTimeout(watchdog);
-    btn.disabled = false;
-    btn.textContent = 'Allow camera & start';
-    showErr('Camera failed: ' + (err && err.name ? err.name + ' — ' : '') + (err && err.message || err));
-    toast('Camera failed — use import photos fallback');
   }
-};
 
-$('galleryBtn').onclick = () => $('gallery').click();
-$('gallery').onchange = e => { addFiles(e.target.files || []); e.target.value = ''; };
-$('shutter').onclick = onShutter;
-$('undoBtn').onclick = () => { if (pages.length) { pages.pop(); renderThumbs(); toast('Removed last page'); } };
-$('clearBtn').onclick = () => { if (pages.length && confirm('Delete all ' + pages.length + ' pages?')) { pages.length = 0; renderThumbs(); toast('Cleared'); } };
-$('endBtn').onclick = buildPdf;
-$('switchBtn').onclick = async () => {
-  facingMode = facingMode === 'environment' ? 'user' : 'environment';
-  try { await startCamera(); toast(facingMode === 'environment' ? 'Back camera' : 'Front camera'); }
-  catch (e) { showErr('Switch failed: ' + (e.message || e)); }
-};
-window.addEventListener('keydown', e => {
-  if (e.code === 'Space' && !$('app').hidden) { e.preventDefault(); onShutter(); }
-});
-window.addEventListener('beforeunload', e => { if (pages.length) { e.preventDefault(); e.returnValue = ''; } });
+  // ---------- image → page ----------
+  function readFileAsDataURL(file) {
+    return new Promise(function (resolve, reject) {
+      var r = new FileReader();
+      r.onload = function () { resolve(r.result); };
+      r.onerror = function () { reject(new Error('Could not read photo')); };
+      r.readAsDataURL(file);
+    });
+  }
+
+  function loadImage(dataUrl) {
+    return new Promise(function (resolve, reject) {
+      var img = new Image();
+      img.onload = function () { resolve(img); };
+      img.onerror = function () { reject(new Error('Bad image data')); };
+      img.src = dataUrl;
+    });
+  }
+
+  // Downscale big phone photos so PDF stays small & jsPDF doesn't choke
+  function encodePage(img, maxEdge) {
+    maxEdge = maxEdge || 2200;
+    var w = img.naturalWidth || img.width;
+    var h = img.naturalHeight || img.height;
+    var scale = 1;
+    var edge = Math.max(w, h);
+    if (edge > maxEdge) scale = maxEdge / edge;
+    var cw = Math.max(1, Math.round(w * scale));
+    var ch = Math.max(1, Math.round(h * scale));
+    var c = document.createElement('canvas');
+    c.width = cw;
+    c.height = ch;
+    var ctx = c.getContext('2d');
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, cw, ch);
+    ctx.drawImage(img, 0, 0, cw, ch);
+    // quality 0.82 — good for text pages, small sink for iPhone 48MP
+    return { dataUrl: c.toDataURL('image/jpeg', 0.82), w: cw, h: ch };
+  }
+
+  async function addFiles(fileList) {
+    var files = Array.prototype.slice.call(fileList || []).filter(function (f) {
+      return f && (f.type || '').indexOf('image/') === 0;
+    });
+    if (!files.length) {
+      toast('No image selected');
+      return;
+    }
+    busy = true;
+    setCount();
+    clearErr();
+    $('progress').classList.add('show');
+    try {
+      for (var i = 0; i < files.length; i++) {
+        $('progressText').textContent = 'Adding… ' + (i + 1) + '/' + files.length;
+        // yield so progress paints on iOS
+        await new Promise(function (r) { setTimeout(r, 0); });
+        var dataUrl = await readFileAsDataURL(files[i]);
+        var img = await loadImage(dataUrl);
+        pages.push(encodePage(img));
+      }
+      renderThumbs();
+      $('status').textContent = 'Captured page ' + pages.length + '. Flip book → Snap next.';
+      toast('Added ' + files.length + (files.length === 1 ? ' page' : ' pages'));
+      if (navigator.vibrate) try { navigator.vibrate(20); } catch (_) {}
+    } catch (err) {
+      showErr('Add failed: ' + (err && err.message ? err.message : err));
+      toast('Failed to add photo');
+    } finally {
+      busy = false;
+      $('progress').classList.remove('show');
+      setCount();
+    }
+  }
+
+  // ---------- jsPDF ----------
+  var jspdfReady = null;
+  function loadJsPdf() {
+    if (window.jspdf && window.jspdf.jsPDF) return Promise.resolve();
+    if (jspdfReady) return jspdfReady;
+    var urls = [
+      'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
+      'https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js'
+    ];
+    jspdfReady = new Promise(function (resolve, reject) {
+      function tryNext(i) {
+        if (i >= urls.length) return reject(new Error('PDF library failed to load (offline?)'));
+        var s = document.createElement('script');
+        s.src = urls[i];
+        s.async = true;
+        s.onload = function () {
+          if (window.jspdf && window.jspdf.jsPDF) resolve();
+          else tryNext(i + 1);
+        };
+        s.onerror = function () { tryNext(i + 1); };
+        document.head.appendChild(s);
+      }
+      tryNext(0);
+    });
+    return jspdfReady;
+  }
+  // warm cache
+  loadJsPdf().catch(function () {});
+
+  async function buildPdf() {
+    if (!pages.length || busy) return;
+    busy = true;
+    setCount();
+    clearErr();
+    $('progress').classList.add('show');
+    $('progressText').textContent = 'Loading PDF engine…';
+    try {
+      await loadJsPdf();
+      var jsPDF = window.jspdf.jsPDF;
+      var first = pages[0];
+      var pdf = new jsPDF({
+        orientation: first.w > first.h ? 'landscape' : 'portrait',
+        unit: 'pt',
+        format: 'a4',
+        compress: true
+      });
+      for (var i = 0; i < pages.length; i++) {
+        $('progressText').textContent = 'Building PDF… ' + (i + 1) + '/' + pages.length;
+        await new Promise(function (r) { setTimeout(r, 0); });
+        var p = pages[i];
+        if (i > 0) pdf.addPage('a4', p.w > p.h ? 'landscape' : 'portrait');
+        var pw = pdf.internal.pageSize.getWidth();
+        var ph = pdf.internal.pageSize.getHeight();
+        var m = 10;
+        var scale = Math.min((pw - m * 2) / p.w, (ph - m * 2) / p.h);
+        var dw = p.w * scale, dh = p.h * scale;
+        pdf.addImage(p.dataUrl, 'JPEG', (pw - dw) / 2, (ph - dh) / 2, dw, dh, undefined, 'FAST');
+      }
+      var name = ($('title').value || 'book-scan').trim().replace(/[\\/:*?"<>|]+/g, '-') || 'book-scan';
+      if (!/\.pdf$/i.test(name)) name += '.pdf';
+      pdf.save(name);
+      toast('Downloaded ' + name);
+      $('status').textContent = 'PDF saved (' + pages.length + ' pages). Keep going or Clear.';
+    } catch (err) {
+      showErr('PDF failed: ' + (err && err.message ? err.message : err));
+      toast('PDF failed — see error above');
+    } finally {
+      busy = false;
+      $('progress').classList.remove('show');
+      setCount();
+    }
+  }
+
+  // ---------- wire UI ----------
+  // Critical for iOS: open file input in the SAME user-gesture turn (no await before .click())
+  $('snapBtn').onclick = function () {
+    clearErr();
+    $('camOne').value = '';
+    try {
+      $('camOne').click();
+    } catch (e) {
+      showErr('Could not open camera: ' + e);
+    }
+  };
+
+  $('importBtn').onclick = function () {
+    clearErr();
+    $('libMany').value = '';
+    $('libMany').click();
+  };
+
+  $('multiCamBtn').onclick = function () {
+    clearErr();
+    // multi without capture → photo library multi-select (iOS doesn't multi-camera Online in one go)
+    $('camMany').value = '';
+    $('camMany').click();
+  };
+
+  $('camOne').onchange = function (e) {
+    var files = e.target.files;
+    if (files && files.length) addFiles(files);
+    // reset so same-looking retake still fires change
+    e.target.value = '';
+  };
+  $('camMany').onchange = function (e) {
+    var files = e.target.files;
+    if (files && files.length) addFiles(files);
+    e.target.value = '';
+  };
+  $('libMany').onchange = function (e) {
+    var files = e.target.files;
+    if (files && files.length) addFiles(files);
+    e.target.value = '';
+  };
+
+  $('undoBtn').onclick = function () {
+    if (!pages.length) return;
+    pages.pop();
+    renderThumbs();
+    toast('Removed last page');
+  };
+  $('clearBtn').onclick = function () {
+    if (!pages.length) return;
+    if (!confirm('Delete all ' + pages.length + ' pages?')) return;
+    pages.length = 0;
+    renderThumbs();
+    toast('Cleared');
+    $('status').textContent = 'Tap Snap → take photo of page 1.';
+  };
+  $('endBtn').onclick = function () { buildPdf(); };
+
+  window.addEventListener('beforeunload', function (e) {
+    if (pages.length) { e.preventDefault(); e.returnValue = ''; }
+  });
+
+  renderThumbs();
+  $('status').textContent = 'Tap Snap → iPhone camera opens → photo becomes page 1.';
+})();
 </script>
 </body>
 </html>
