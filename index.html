@@ -2,546 +2,376 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="mobile-web-app-capable" content="yes" />
   <meta name="theme-color" content="#0a0a0b" />
   <title>Book Scanner → PDF</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
   <style>
-    :root {
-      --bg: #0a0a0b;
-      --panel: #141417;
-      --panel-2: #1c1c21;
-      --border: #2a2a32;
-      --text: #f4f4f5;
-      --muted: #a1a1aa;
-      --accent: #7cffb2;
-      --danger: #ff6b7a;
-      --warn: #ffd36b;
-      --shutter: #f4f4f5;
-      --safe-b: env(safe-area-inset-bottom, 0px);
-      --safe-t: env(safe-area-inset-top, 0px);
-    }
-    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-    html, body {
-      margin: 0; height: 100%; background: var(--bg); color: var(--text);
-      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-      overflow: hidden;
-    }
-    #app {
-      height: 100%; display: grid;
-      grid-template-rows: auto 1fr auto auto;
-      padding-top: var(--safe-t);
-    }
-    header {
-      display: flex; align-items: center; justify-content: space-between;
-      gap: 10px; padding: 10px 14px; background: rgba(10,10,11,.92);
-      border-bottom: 1px solid var(--border); backdrop-filter: blur(10px);
-      z-index: 5;
-    }
-    header h1 {
-      margin: 0; font-size: 15px; font-weight: 650; letter-spacing: .01em;
-    }
-    header .meta { color: var(--muted); font-size: 12px; }
-    .badge {
-      display: inline-flex; align-items: center; gap: 6px;
-      background: var(--panel-2); border: 1px solid var(--border);
-      border-radius: 999px; padding: 4px 10px; font-size: 12px; font-weight: 600;
-    }
-    .badge .dot {
-      width: 7px; height: 7px; border-radius: 50%; background: var(--muted);
-    }
-    .badge.live .dot { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
-    #stage {
-      position: relative; overflow: hidden; background: #000;
-      min-height: 0;
-    }
-    #video, #freeze {
-      position: absolute; inset: 0; width: 100%; height: 100%;
-      object-fit: cover; background: #000;
-    }
-    #freeze { display: none; }
-    #overlay {
-      position: absolute; inset: 0; pointer-events: none;
-    }
-    #guide {
-      position: absolute; left: 6%; right: 6%; top: 8%; bottom: 10%;
-      border: 1.5px solid rgba(124,255,178,.55);
-      border-radius: 10px;
-      box-shadow: 0 0 0 9999px rgba(0,0,0,.28);
-    }
-    #flash {
-      position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none;
-      transition: opacity .08s linear;
-    }
-    #flash.on { opacity: .85; }
-    #status {
-      position: absolute; left: 12px; right: 12px; bottom: 12px;
-      text-align: center; font-size: 12px; color: #fff;
-      text-shadow: 0 1px 3px rgba(0,0,0,.8);
-    }
-    #thumbs-wrap {
-      background: var(--panel); border-top: 1px solid var(--border);
-      padding: 8px 10px calc(8px + var(--safe-b));
-      min-height: 92px;
-    }
-    #thumbs {
-      display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px;
-      scrollbar-width: none;
-    }
-    #thumbs::-webkit-scrollbar { display: none; }
-    .thumb {
-      position: relative; flex: 0 0 auto; width: 64px; height: 84px;
-      border-radius: 8px; overflow: hidden; border: 1px solid var(--border);
-      background: #000;
-    }
-    .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
-    .thumb .n {
-      position: absolute; left: 4px; top: 4px; background: rgba(0,0,0,.7);
-      color: #fff; font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 999px;
-    }
-    .thumb button.x {
-      position: absolute; right: 2px; top: 2px; width: 20px; height: 20px;
-      border: 0; border-radius: 50%; background: rgba(0,0,0,.7); color: #fff;
-      font-size: 12px; line-height: 1; padding: 0;
-    }
-    #empty-thumbs {
-      color: var(--muted); font-size: 12px; padding: 22px 8px; text-align: center;
-    }
-    #controls {
-      display: grid; grid-template-columns: 1fr auto 1fr;
-      align-items: center; gap: 8px;
-      padding: 12px 16px calc(14px + var(--safe-b));
-      background: rgba(10,10,11,.96); border-top: 1px solid var(--border);
-    }
-    .side {
-      display: flex; flex-direction: column; gap: 8px; align-items: stretch;
-    }
-    .side.right { align-items: end; }
-    .side.left { align-items: start; }
-    button, .file-btn {
-      appearance: none; border: 1px solid var(--border); background: var(--panel-2);
-      color: var(--text); border-radius: 12px; padding: 10px 12px;
-      font-size: 13px; font-weight: 600; cursor: pointer;
-    }
-    button:disabled { opacity: .4; cursor: not-allowed; }
-    button.ghost { background: transparent; }
-    button.danger { border-color: rgba(255,107,122,.4); color: var(--danger); }
-    button.primary {
-      background: linear-gradient(180deg, #9dffc6, var(--accent));
-      color: #062314; border-color: transparent; font-weight: 750;
-    }
-    #shutter {
-      width: 78px; height: 78px; border-radius: 50%;
-      border: 4px solid #fff; background: transparent; padding: 0;
-      display: grid; place-items: center; position: relative;
-    }
-    #shutter::after {
-      content: ""; width: 60px; height: 60px; border-radius: 50%;
-      background: var(--shutter);
-    }
-    #shutter:active::after { transform: scale(.92); background: var(--accent); }
-    #shutter.busy { opacity: .5; pointer-events: none; }
-    #gate {
-      position: fixed; inset: 0; background: var(--bg); z-index: 20;
-      display: grid; place-items: center; padding: 24px;
-    }
-    #gate .card {
-      width: min(420px, 100%); background: var(--panel);
-      border: 1px solid var(--border); border-radius: 18px; padding: 22px;
-    }
-    #gate h2 { margin: 0 0 8px; font-size: 20px; }
-    #gate p { margin: 0 0 14px; color: var(--muted); font-size: 14px; line-height: 1.45; }
-    #gate ul { margin: 0 0 16px; padding-left: 18px; color: var(--muted); font-size: 13px; line-height: 1.5; }
-    #gate .row { display: flex; flex-direction: column; gap: 8px; }
-    #toast {
-      position: fixed; left: 50%; bottom: calc(120px + var(--safe-b));
-      transform: translateX(-50%) translateY(20px);
-      background: #111; border: 1px solid var(--border); color: var(--text);
-      padding: 10px 14px; border-radius: 12px; font-size: 13px; opacity: 0;
-      pointer-events: none; transition: .2s ease; z-index: 30; max-width: 90vw;
-    }
-    #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-    #progress {
-      display: none; position: fixed; inset: 0; background: rgba(0,0,0,.72);
-      z-index: 40; place-items: center; color: #fff; font-size: 15px;
-    }
-    #progress.show { display: grid; }
-    #progress .box {
-      background: var(--panel); border: 1px solid var(--border);
-      border-radius: 14px; padding: 18px 22px; min-width: 220px; text-align: center;
-    }
-    label.inline {
-      display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px;
-    }
-    input[type="text"] {
-      width: 100%; background: var(--panel-2); border: 1px solid var(--border);
-      color: var(--text); border-radius: 10px; padding: 10px 12px; font-size: 14px;
-      margin-bottom: 12px;
-    }
-    .hint { font-size: 11px; color: var(--muted); margin-top: 6px; }
+    :root { --bg:#0a0a0b; --panel:#141417; --panel2:#1c1c21; --border:#2a2a32; --text:#f4f4f5; --muted:#a1a1aa; --accent:#7cffb2; --danger:#ff6b7a; }
+    * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+    html,body { margin:0; height:100%; background:var(--bg); color:var(--text); font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; overflow:hidden; }
+    #app { height:100%; display:grid; grid-template-rows:auto 1fr auto auto; }
+    header { display:flex; align-items:center; justify-content:space-between; padding:10px 14px; background:rgba(10,10,11,.92); border-bottom:1px solid var(--border); z-index:5; }
+    header h1 { margin:0; font-size:15px; font-weight:650; }
+    .badge { display:inline-flex; align-items:center; gap:6px; background:var(--panel2); border:1px solid var(--border); border-radius:999px; padding:4px 10px; font-size:12px; font-weight:600; }
+    .badge .dot { width:7px; height:7px; border-radius:50%; background:var(--muted); }
+    .badge.live .dot { background:var(--accent); box-shadow:0 0 8px var(--accent); }
+    #stage { position:relative; overflow:hidden; background:#000; min-height:0; }
+    #video { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; background:#000; }
+    #guide { position:absolute; left:6%; right:6%; top:8%; bottom:10%; border:1.5px solid rgba(124,255,178,.55); border-radius:10px; box-shadow:0 0 0 9999px rgba(0,0,0,.28); pointer-events:none; }
+    #flash { position:absolute; inset:0; background:#fff; opacity:0; pointer-events:none; transition:opacity .08s linear; }
+    #flash.on { opacity:.85; }
+    #status { position:absolute; left:12px; right:12px; bottom:12px; text-align:center; font-size:12px; color:#fff; text-shadow:0 1px 3px rgba(0,0,0,.8); pointer-events:none; }
+    #thumbs-wrap { background:var(--panel); border-top:1px solid var(--border); padding:8px 10px calc(8px + env(safe-area-inset-bottom,0px)); min-height:92px; }
+    #thumbs { display:flex; gap:8px; overflow-x:auto; }
+    .thumb { position:relative; flex:0 0 auto; width:64px; height:84px; border-radius:8px; overflow:hidden; border:1px solid var(--border); background:#000; }
+    .thumb img { width:100%; height:100%; object-fit:cover; display:block; }
+    .thumb .n { position:absolute; left:4px; top:4px; background:rgba(0,0,0,.7); color:#fff; font-size:10px; font-weight:700; padding:1px 5px; border-radius:999px; }
+    .thumb button.x { position:absolute; right:2px; top:2px; width:20px; height:20px; border:0; border-radius:50%; background:rgba(0,0,0,.7); color:#fff; font-size:12px; padding:0; }
+    #empty { color:var(--muted); font-size:12px; padding:22px 8px; text-align:center; }
+    #controls { display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:8px; padding:12px 16px calc(14px + env(safe-area-inset-bottom,0px)); background:rgba(10,10,11,.96); border-top:1px solid var(--border); }
+    .side { display:flex; flex-direction:column; gap:8px; }
+    .side.right { align-items:end; }
+    button { appearance:none; border:1px solid var(--border); background:var(--panel2); color:var(--text); border-radius:12px; padding:10px 12px; font-size:13px; font-weight:600; cursor:pointer; }
+    button:disabled { opacity:.4; }
+    button.danger { border-color:rgba(255,107,122,.4); color:var(--danger); }
+    button.primary { background:linear-gradient(180deg,#9dffc6,var(--accent)); color:#062314; border-color:transparent; font-weight:750; }
+    #shutter { width:78px; height:78px; border-radius:50%; border:4px solid #fff; background:transparent; padding:0; display:grid; place-items:center; }
+    #shutter::after { content:""; width:60px; height:60px; border-radius:50%; background:#f4f4f5; }
+    #shutter:active::after { transform:scale(.92); background:var(--accent); }
+    #gate { position:fixed; inset:0; background:var(--bg); z-index:20; display:grid; place-items:center; padding:24px; }
+    #gate .card { width:min(420px,100%); background:var(--panel); border:1px solid var(--border); border-radius:18px; padding:22px; }
+    #gate h2 { margin:0 0 8px; font-size:20px; }
+    #gate p, #gate li { color:var(--muted); font-size:14px; line-height:1.45; }
+    #gate ul { margin:0 0 16px; padding-left:18px; }
+    #gate .row { display:flex; flex-direction:column; gap:8px; }
+    input[type="text"] { width:100%; background:var(--panel2); border:1px solid var(--border); color:var(--text); border-radius:10px; padding:10px 12px; font-size:14px; margin-bottom:12px; }
+    #toast { position:fixed; left:50%; bottom:calc(130px + env(safe-area-inset-bottom,0px)); transform:translateX(-50%) translateY(20px); background:#111; border:1px solid var(--border); padding:10px 14px; border-radius:12px; font-size:13px; opacity:0; pointer-events:none; transition:.2s; z-index:30; max-width:90vw; }
+    #toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+    #progress { display:none; position:fixed; inset:0; background:rgba(0,0,0,.72); z-index:40; place-items:center; }
+    #progress.show { display:grid; }
+    #progress .box { background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:18px 22px; min-width:220px; text-align:center; }
+    #err { position:fixed; left:8px; right:8px; bottom:8px; z-index:50; color:#ff9; font-size:11px; white-space:pre-wrap; pointer-events:none; max-height:30vh; overflow:auto; }
   </style>
 </head>
 <body>
-  <div id="gate">
-    <div class="card">
-      <h2>Book Scanner</h2>
-      <p>Uses your <b>back camera</b>. Snap each page, then tap <b>End → PDF</b> for one multi-page file. Everything stays on your phone until you download.</p>
-      <ul>
-        <li>HTTPS required (this GitHub Pages link works)</li>
-        <li>Good light, fill the green frame, hold steady</li>
-        <li>Missing a page? Delete that thumbnail and reshoot</li>
-      </ul>
-      <label class="inline" style="margin-bottom:10px">PDF title</label>
-      <input id="title" type="text" value="book-scan" autocomplete="off" />
-      <div class="row">
-        <button class="primary" id="startBtn" type="button">Allow camera & start</button>
-        <button class="ghost" id="galleryBtn" type="button">Or import photos instead</button>
-        <input id="gallery" type="file" accept="image/*" multiple capture="environment" hidden />
-      </div>
-      <div class="hint">Tip: landscape or portrait both OK — PDF pages auto-fit.</div>
+<div id="gate">
+  <div class="card">
+    <h2>Book Scanner</h2>
+    <p>Uses your <b>back camera</b>. Snap each page, then tap <b>End → PDF</b> for one multi-page file. Pages stay on your phone.</p>
+    <ul>
+      <li>HTTPS only (GitHub Pages link works)</li>
+      <li>Good light, fill the green frame, hold steady</li>
+    </ul>
+    <input id="title" type="text" value="book-scan" autocomplete="off" />
+    <div class="row">
+      <button class="primary" id="startBtn" type="button">Allow camera & start</button>
+      <button id="galleryBtn" type="button">Or import photos instead</button>
+      <input id="gallery" type="file" accept="image/*" multiple hidden />
     </div>
   </div>
+</div>
 
-  <div id="app" hidden>
-    <header>
-      <div>
-        <h1>Book Scanner</h1>
-        <div class="meta" id="headerMeta">backing camera</div>
-      </div>
-      <div class="badge" id="liveBadge"><span class="dot"></span><span id="pageCount">0 pages</span></div>
-    </header>
-
-    <div id="stage">
-      <video id="video" playsinline autoplay muted></video>
-      <canvas id="freeze"></canvas>
-      <div id="overlay">
-        <div id="guide"></div>
-        <div id="flash"></div>
-        <div id="status">Align page inside frame · tap shutter</div>
-      </div>
+<div id="app" hidden>
+  <header>
+    <div><h1>Book Scanner</h1></div>
+    <div class="badge" id="liveBadge"><span class="dot"></span><span id="pageCount">0 pages</span></div>
+  </header>
+  <div id="stage">
+    <video id="video" playsinline autoplay muted></video>
+    <div id="guide"></div>
+    <div id="flash"></div>
+    <div id="status">Align page inside frame · tap shutter</div>
+  </div>
+  <div id="thumbs-wrap">
+    <div id="empty">No pages yet — capture the first one</div>
+    <div id="thumbs" hidden></div>
+  </div>
+  <div id="controls">
+    <div class="side">
+      <button type="button" id="undoBtn" disabled>Undo</button>
+      <button type="button" id="clearBtn" class="danger" disabled>Clear</button>
     </div>
-
-    <div id="thumbs-wrap">
-      <div id="empty-thumbs">No pages yet — capture the first one</div>
-      <div id="thumbs" hidden></div>
-    </div>
-
-    <div id="controls">
-      <div class="side left">
-        <button type="button" id="undoBtn" disabled>Undo last</button>
-        <button type="button" id="clearBtn" class="danger" disabled>Clear all</button>
-      </div>
-      <button type="button" id="shutter" aria-label="Capture page"></button>
-      <div class="side right">
-        <button type="button" class="primary" id="endBtn" disabled>End → PDF</button>
-        <button type="button" class="ghost" id="switchBtn">Flip cam</button>
-      </div>
+    <button type="button" id="shutter" aria-label="Capture"></button>
+    <div class="side right">
+      <button type="button" class="primary" id="endBtn" disabled>End → PDF</button>
+      <button type="button" id="switchBtn">Flip cam</button>
     </div>
   </div>
+</div>
 
-  <div id="toast"></div>
-  <div id="progress"><div class="box" id="progressText">Building PDF…</div></div>
+<div id="toast"></div>
+<div id="progress"><div class="box" id="progressText">Building PDF…</div></div>
+<div id="err"></div>
 
-  <script>
-    const $ = (id) => document.getElementById(id);
-    const pages = []; // { dataUrl, w, h }
-    let stream = null;
-    let facingMode = 'environment';
-    let capturing = false;
+<script>
+// ---------- tiny helpers ----------
+const $ = id => document.getElementById(id);
+const pages = [];
+let stream = null;
+let facingMode = 'environment';
+let capturing = false;
 
-    const video = $('video');
-    const freeze = $('freeze');
-    const fctx = freeze.getContext('2d');
+function toast(msg, ms = 2600) {
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => t.classList.remove('show'), ms);
+}
+function showErr(msg) {
+  $('err').textContent = (msg + '').slice(0, 400);
+  setTimeout(() => { $('err').textContent = ''; }, 6000);
+  console.error(msg);
+}
 
-    function toast(msg, ms = 2200) {
-      const t = $('toast');
-      t.textContent = msg;
-      t.classList.add('show');
-      clearTimeout(toast._t);
-      toast._t = setTimeout(() => t.classList.remove('show'), ms);
+// ---------- load jsPDF lazily & robustly ----------
+let jspdfReady = null;
+function loadJsPdf() {
+  if (window.jspdf && window.jspdf.jsPDF) return Promise.resolve();
+  if (jspdfReady) return jspdfReady;
+  const urls = [
+    'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
+    'https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js'
+  ];
+  jspdfReady = new Promise((resolve, reject) => {
+    (function tryNext(i) {
+      if (i >= urls.length) return reject(new Error('PDF library failed to load'));
+      const s = document.createElement('script');
+      s.src = urls[i];
+      s.onload = () => (window.jspdf && window.jspdf.jsPDF) ? resolve() : tryNext(i + 1);
+      s.onerror = () => tryNext(i + 1);
+      document.head.appendChild(s);
+    })(0);
+  });
+  return jspdfReady;
+}
+// warm it up early (non-blocking)
+loadJsPdf().catch(() => {});
+
+// ---------- UI state ----------
+function setCount() {
+  const n = pages.length;
+  $('pageCount').textContent = n + (n === 1 ? ' page' : ' pages');
+  $('undoBtn').disabled = n === 0;
+  $('clearBtn').disabled = n === 0;
+  $('endBtn').disabled = n === 0;
+  $('empty').hidden = n > 0;
+  $('thumbs').hidden = n === 0;
+  $('liveBadge').classList.toggle('live', !!stream);
+}
+function renderThumbs() {
+  const root = $('thumbs');
+  root.innerHTML = '';
+  pages.forEach((p, i) => {
+    const el = document.createElement('div');
+    el.className = 'thumb';
+    el.innerHTML = '<img src="' + p.dataUrl + '" /><span class="n">' + (i + 1) + '</span>';
+    const x = document.createElement('button');
+    x.className = 'x'; x.type = 'button'; x.textContent = '×';
+    x.onclick = () => { pages.splice(i, 1); renderThumbs(); toast('Removed page ' + (i + 1)); };
+    el.appendChild(x);
+    root.appendChild(el);
+  });
+  root.scrollLeft = root.scrollWidth;
+  setCount();
+}
+
+// ---------- camera ----------
+function stopCamera() {
+  if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+  $('video').srcObject = null;
+}
+
+function waitForVideo(video, ms = 9000) {
+  return new Promise((resolve, reject) => {
+    let done = false;
+    const to = setTimeout(() => {
+      if (done) return; done = true;
+      if (video.videoWidth) resolve(); else reject(new Error('Camera timed out (no frames)'));
+    }, ms);
+    function check() {
+      if (done) return;
+      if (video.videoWidth > 0) { done = true; clearTimeout(to); resolve(); return; }
+      requestAnimationFrame(check);
     }
+    check();
+  });
+}
 
-    function setCount() {
-      const n = pages.length;
-      $('pageCount').textContent = n + (n === 1 ? ' page' : ' pages');
-      $('undoBtn').disabled = n === 0;
-      $('clearBtn').disabled = n === 0;
-      $('endBtn').disabled = n === 0;
-      $('empty-thumbs').hidden = n > 0;
-      $('thumbs').hidden = n === 0;
-      $('liveBadge').classList.toggle('live', !!stream);
-    }
-
-    function renderThumbs() {
-      const root = $('thumbs');
-      root.innerHTML = '';
-      pages.forEach((p, i) => {
-        const el = document.createElement('div');
-        el.className = 'thumb';
-        el.innerHTML = `<img alt="page ${i+1}" src="${p.dataUrl}" /><span class="n">${i+1}</span>`;
-        const x = document.createElement('button');
-        x.className = 'x';
-        x.type = 'button';
-        x.textContent = '×';
-        x.onclick = () => {
-          pages.splice(i, 1);
-          renderThumbs();
-          setCount();
-          toast('Removed page ' + (i + 1));
-        };
-        el.appendChild(x);
-        root.appendChild(el);
-      });
-      root.scrollLeft = root.scrollWidth;
-      setCount();
-    }
-
-    async function startCamera() {
-      stopCamera();
-      const constraints = {
-        audio: false,
-        video: {
-          facingMode: { ideal: facingMode },
-          width: { ideal: 1920 },
-          height: { ideal: 1440 },
-        },
-      };
-      try {
-        stream = await navigator.mediaDevices.getUserMedia(constraints);
-      } catch (e1) {
-        // fallback without ideal sizes
-        stream = await navigator.mediaDevices.getUserMedia({
-          audio: false,
-          video: { facingMode },
-        });
-      }
+async function startCamera() {
+  stopCamera();
+  const video = $('video');
+  const tries = [
+    { audio: false, video: { facingMode: { exact: facingMode } } },
+    { audio: false, video: { facingMode: facingMode } },
+    { audio: false, video: true }
+  ];
+  let lastErr = null;
+  for (const c of tries) {
+    try {
+      stream = await navigator.mediaDevices.getUserMedia(c);
       video.srcObject = stream;
-      await video.play();
+      // play() can hang on some mobile browsers — don't await it, race a timeout
+      const playP = video.play().catch(() => {});
+      await Promise.race([playP, new Promise(r => setTimeout(r, 3000))]);
+      await waitForVideo(video);
       $('liveBadge').classList.add('live');
-      $('headerMeta').textContent = facingMode === 'environment' ? 'back camera' : 'front camera';
-      $('status').textContent = 'Align page inside frame · tap shutter';
+      return;
+    } catch (e) {
+      lastErr = e;
+      stopCamera();
     }
+  }
+  throw lastErr || new Error('Could not start camera');
+}
 
-    function stopCamera() {
-      if (stream) {
-        stream.getTracks().forEach((t) => t.stop());
-        stream = null;
-      }
-      video.srcObject = null;
+// ---------- capture ----------
+function flash() { const f = $('flash'); f.classList.add('on'); setTimeout(() => f.classList.remove('on'), 80); }
+
+async function onShutter() {
+  if (capturing) return;
+  const video = $('video');
+  if (!stream || !video.videoWidth) { toast('Camera not ready'); return; }
+  capturing = true;
+  try {
+    flash();
+    await new Promise(r => setTimeout(r, 30));
+    const w = video.videoWidth, h = video.videoHeight;
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    c.getContext('2d').drawImage(video, 0, 0, w, h);
+    pages.push({ dataUrl: c.toDataURL('image/jpeg', 0.85), w, h });
+    renderThumbs();
+    $('status').textContent = 'Captured page ' + pages.length + ' · flip to next';
+    if (navigator.vibrate) navigator.vibrate(25);
+  } catch (err) {
+    showErr('Capture failed: ' + (err.message || err));
+  } finally {
+    capturing = false;
+  }
+}
+
+// ---------- PDF ----------
+async function buildPdf() {
+  if (!pages.length) return;
+  $('progress').classList.add('show');
+  $('progressText').textContent = 'Loading PDF engine…';
+  try {
+    await loadJsPdf();
+  } catch (e) {
+    $('progress').classList.remove('show');
+    toast('PDF engine failed — check network, try import→export again');
+    return;
+  }
+  const { jsPDF } = window.jspdf;
+  try {
+    const first = pages[0];
+    const pdf = new jsPDF({ orientation: first.w > first.h ? 'landscape' : 'portrait', unit: 'pt', format: 'a4', compress: true });
+    for (let i = 0; i < pages.length; i++) {
+      $('progressText').textContent = 'Building PDF… ' + (i + 1) + '/' + pages.length;
+      await new Promise(r => setTimeout(r, 0));
+      const p = pages[i];
+      if (i > 0) pdf.addPage('a4', p.w > p.h ? 'landscape' : 'portrait');
+      const pw = pdf.internal.pageSize.getWidth();
+      const ph = pdf.internal.pageSize.getHeight();
+      const m = 12;
+      const scale = Math.min((pw - m * 2) / p.w, (ph - m * 2) / p.h);
+      const dw = p.w * scale, dh = p.h * scale;
+      pdf.addImage(p.dataUrl, 'JPEG', (pw - dw) / 2, (ph - dh) / 2, dw, dh, undefined, 'FAST');
     }
+    let name = ($('title').value || 'book-scan').trim().replace(/[\\/:*?"<>|]+/g, '-') || 'book-scan';
+    if (!name.toLowerCase().endsWith('.pdf')) name += '.pdf';
+    pdf.save(name);
+    toast('Saved ' + name + ' (' + pages.length + ' pages)');
+  } catch (err) {
+    showErr('PDF failed: ' + (err.message || err));
+  } finally {
+    $('progress').classList.remove('show');
+  }
+}
 
-    function flash() {
-      const f = $('flash');
-      f.classList.add('on');
-      setTimeout(() => f.classList.remove('on'), 80);
-    }
-
-    function captureFrame() {
-      if (!video.videoWidth) throw new Error('Camera not ready');
-      const w = video.videoWidth;
-      const h = video.videoHeight;
-      freeze.width = w;
-      freeze.height = h;
-      fctx.drawImage(video, 0, 0, w, h);
-      // JPEG keeps PDF smaller than PNG for photos
-      const dataUrl = freeze.toDataURL('image/jpeg', 0.92);
-      return { dataUrl, w, h };
-    }
-
-    async function onShutter() {
-      if (capturing) return;
-      if (!stream || !video.videoWidth) {
-        toast('Camera not ready');
-        return;
-      }
-      capturing = true;
-      $('shutter').classList.add('busy');
-      try {
-        flash();
-        // tiny delay so user sees flash while frame is still stable
-        await new Promise((r) => setTimeout(r, 30));
-        const page = captureFrame();
-        pages.push(page);
-        renderThumbs();
-        $('status').textContent = `Captured page ${pages.length} · flip to next`;
-        if (navigator.vibrate) navigator.vibrate(25);
-      } catch (err) {
-        console.error(err);
-        toast('Capture failed: ' + (err.message || err));
-      } finally {
-        capturing = false;
-        $('shutter').classList.remove('busy');
-      }
-    }
-
-    function loadImage(dataUrl) {
-      return new Promise((resolve, reject) => {
-        const img = new Image();
-        img.onload = () => resolve(img);
-        img.onerror = reject;
-        img.src = dataUrl;
+// ---------- photo import fallback ----------
+async function addFiles(fileList) {
+  const files = [...fileList].filter(f => f.type.startsWith('image/'));
+  if (!files.length) { toast('No images selected'); return; }
+  $('progress').classList.add('show');
+  try {
+    for (let i = 0; i < files.length; i++) {
+      $('progressText').textContent = 'Importing… ' + (i + 1) + '/' + files.length;
+      const dataUrl = await new Promise((res, rej) => {
+        const r = new FileReader();
+        r.onload = () => res(r.result); r.onerror = rej;
+        r.readAsDataURL(files[i]);
       });
+      const img = await new Promise((res, rej) => {
+        const im = new Image();
+        im.onload = () => res(im); im.onerror = rej;
+        im.src = dataUrl;
+      });
+      const c = document.createElement('canvas');
+      c.width = img.naturalWidth; c.height = img.naturalHeight;
+      c.getContext('2d').drawImage(img, 0, 0);
+      pages.push({ dataUrl: c.toDataURL('image/jpeg', 0.85), w: img.naturalWidth, h: img.naturalHeight });
     }
+    $('gate').hidden = true;
+    $('app').hidden = false;
+    renderThumbs();
+    toast('Imported ' + files.length + ' photos');
+  } catch (err) {
+    showErr('Import failed: ' + (err.message || err));
+  } finally {
+    $('progress').classList.remove('show');
+  }
+}
 
-    async function buildPdf() {
-      if (!pages.length) return;
-      if (!window.jspdf || !window.jspdf.jsPDF) {
-        toast('PDF library failed to load — check network');
-        return;
-      }
-      const { jsPDF } = window.jspdf;
-      $('progress').classList.add('show');
-      $('progressText').textContent = 'Building PDF… 0/' + pages.length;
-      try {
-        // size from first page aspect: choose portrait A4-like or landscape
-        const first = pages[0];
-        const landscape = first.w > first.h;
-        const pdf = new jsPDF({
-          orientation: landscape ? 'landscape' : 'portrait',
-          unit: 'pt',
-          format: 'a4',
-          compress: true,
-        });
+// ---------- wire up ----------
+$('startBtn').onclick = async () => {
+  const btn = $('startBtn');
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    toast('Camera API not available — use import photos'); return;
+  }
+  if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
+    toast('Camera needs HTTPS'); return;
+  }
+  btn.disabled = true;
+  btn.textContent = 'Starting…';
+  // watchdog: never stay stuck on "Starting…"
+  const watchdog = setTimeout(() => {
+    btn.disabled = false;
+    btn.textContent = 'Allow camera & start';
+    toast('Camera is slow — check permission, or import photos');
+  }, 15000);
+  try {
+    await startCamera();
+    clearTimeout(watchdog);
+    $('gate').hidden = true;
+    $('app').hidden = false;
+    setCount();
+  } catch (err) {
+    clearTimeout(watchdog);
+    btn.disabled = false;
+    btn.textContent = 'Allow camera & start';
+    showErr('Camera failed: ' + (err && err.name ? err.name + ' — ' : '') + (err && err.message || err));
+    toast('Camera failed — use import photos fallback');
+  }
+};
 
-        for (let i = 0; i < pages.length; i++) {
-          $('progressText').textContent = `Building PDF… ${i + 1}/${pages.length}`;
-          // yield UI
-          await new Promise((r) => setTimeout(r, 0));
-          const p = pages[i];
-          if (i > 0) {
-            const land = p.w > p.h;
-            pdf.addPage('a4', land ? 'landscape' : 'portrait');
-          }
-          const pw = pdf.internal.pageSize.getWidth();
-          const ph = pdf.internal.pageSize.getHeight();
-          const margin = 12;
-          const maxW = pw - margin * 2;
-          const maxH = ph - margin * 2;
-          const scale = Math.min(maxW / p.w, maxH / p.h);
-          const dw = p.w * scale;
-          const dh = p.h * scale;
-          const x = (pw - dw) / 2;
-          const y = (ph - dh) / 2;
-          pdf.addImage(p.dataUrl, 'JPEG', x, y, dw, dh, undefined, 'FAST');
-        }
-
-        let name = ($('title').value || 'book-scan').trim().replace(/[\\/:*?"<>|]+/g, '-') || 'book-scan';
-        if (!name.toLowerCase().endsWith('.pdf')) name += '.pdf';
-        pdf.save(name);
-        toast('Downloaded ' + name + ' (' + pages.length + ' pages)');
-        $('status').textContent = 'PDF saved · keep scanning or Clear all';
-      } catch (err) {
-        console.error(err);
-        toast('PDF failed: ' + (err.message || err));
-      } finally {
-        $('progress').classList.remove('show');
-      }
-    }
-
-    async function addFiles(fileList) {
-      const files = [...fileList].filter((f) => f.type.startsWith('image/'));
-      if (!files.length) {
-        toast('No images selected');
-        return;
-      }
-      $('progress').classList.add('show');
-      for (let i = 0; i < files.length; i++) {
-        $('progressText').textContent = `Importing… ${i + 1}/${files.length}`;
-        const file = files[i];
-        const dataUrl = await new Promise((resolve, reject) => {
-          const r = new FileReader();
-          r.onload = () => resolve(r.result);
-          r.onerror = reject;
-          r.readAsDataURL(file);
-        });
-        const img = await loadImage(dataUrl);
-        // re-encode as jpeg for size
-        const c = document.createElement('canvas');
-        c.width = img.naturalWidth;
-        c.height = img.naturalHeight;
-        c.getContext('2d').drawImage(img, 0, 0);
-        pages.push({
-          dataUrl: c.toDataURL('image/jpeg', 0.92),
-          w: img.naturalWidth,
-          h: img.naturalHeight,
-        });
-      }
-      $('progress').classList.remove('show');
-      $('gate').hidden = true;
-      $('app').hidden = false;
-      renderThumbs();
-      toast('Imported ' + files.length + ' photos');
-    }
-
-    $('startBtn').onclick = async () => {
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        toast('Camera API not available in this browser');
-        return;
-      }
-      if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
-        toast('Camera needs HTTPS — open the GitHub Pages link');
-        return;
-      }
-      try {
-        $('startBtn').disabled = true;
-        $('startBtn').textContent = 'Starting…';
-        await startCamera();
-        $('gate').hidden = true;
-        $('app').hidden = false;
-        setCount();
-      } catch (err) {
-        console.error(err);
-        $('startBtn').disabled = false;
-        $('startBtn').textContent = 'Allow camera & start';
-        toast('Camera permission denied or unavailable');
-      }
-    };
-
-    $('galleryBtn').onclick = () => $('gallery').click();
-    $('gallery').onchange = (e) => addFiles(e.target.files || []);
-
-    $('shutter').onclick = onShutter;
-    $('undoBtn').onclick = () => {
-      if (!pages.length) return;
-      pages.pop();
-      renderThumbs();
-      toast('Removed last page');
-    };
-    $('clearBtn').onclick = () => {
-      if (!pages.length) return;
-      if (!confirm('Delete all ' + pages.length + ' pages?')) return;
-      pages.splice(0, pages.length);
-      renderThumbs();
-      toast('Cleared');
-    };
-    $('endBtn').onclick = buildPdf;
-    $('switchBtn').onclick = async () => {
-      facingMode = facingMode === 'environment' ? 'user' : 'environment';
-      try {
-        await startCamera();
-        toast(facingMode === 'environment' ? 'Back camera' : 'Front camera');
-      } catch (e) {
-        toast('Could not switch camera');
-      }
-    };
-
-    // Space / volume-ish hardware can't map safely; Enter as shutter when focused
-    window.addEventListener('keydown', (e) => {
-      if (e.code === 'Space' && !$('app').hidden) {
-        e.preventDefault();
-        onShutter();
-      }
-    });
-
-    // leave page warning if pages exist
-    window.addEventListener('beforeunload', (e) => {
-      if (pages.length) {
-        e.preventDefault();
-        e.returnValue = '';
-      }
-    });
-  </script>
+$('galleryBtn').onclick = () => $('gallery').click();
+$('gallery').onchange = e => { addFiles(e.target.files || []); e.target.value = ''; };
+$('shutter').onclick = onShutter;
+$('undoBtn').onclick = () => { if (pages.length) { pages.pop(); renderThumbs(); toast('Removed last page'); } };
+$('clearBtn').onclick = () => { if (pages.length && confirm('Delete all ' + pages.length + ' pages?')) { pages.length = 0; renderThumbs(); toast('Cleared'); } };
+$('endBtn').onclick = buildPdf;
+$('switchBtn').onclick = async () => {
+  facingMode = facingMode === 'environment' ? 'user' : 'environment';
+  try { await startCamera(); toast(facingMode === 'environment' ? 'Back camera' : 'Front camera'); }
+  catch (e) { showErr('Switch failed: ' + (e.message || e)); }
+};
+window.addEventListener('keydown', e => {
+  if (e.code === 'Space' && !$('app').hidden) { e.preventDefault(); onShutter(); }
+});
+window.addEventListener('beforeunload', e => { if (pages.length) { e.preventDefault(); e.returnValue = ''; } });
+</script>
 </body>
 </html>
